@@ -49,10 +49,12 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 ### 1. **lint** (Always Runs)
 
 **What it does:**
+
 - Installs Node.js dependencies
 - Runs ESLint on `packages/backend` and `packages/frontend`
 
 **Why it's required:**
+
 - Catches syntax errors, style violations, and code quality issues early
 - Prevents inconsistent code from entering the codebase
 - Enforces team coding standards
@@ -64,11 +66,13 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 ### 2. **test** (Always Runs)
 
 **What it does:**
+
 - Installs Node.js dependencies
 - Runs Jest on `packages/backend` with coverage reporting
 - Appends test coverage summary (Lines, Branches, Functions, Statements %) to GitHub Step Summary
 
 **Why it's required:**
+
 - Validates application behavior (CRUD operations, API endpoints)
 - Enforces minimum 80% code coverage (job fails if coverage drops below 80%)
 - Provides visibility into test quality via GitHub Actions UI
@@ -82,11 +86,13 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 ### 3. **security-scan** (Conditional: PR only)
 
 **What it does:**
+
 - Installs Checkov (IaC security scanner)
 - Scans `infra/` directory for HIGH severity findings
 - Fails if any HIGH findings are detected
 
 **Why it's required:**
+
 - Detects security misconfigurations in Terraform code (unencrypted storage, overly permissive policies, etc.)
 - Prevents insecure infrastructure from reaching production
 - Leverages policy-as-code to enforce compliance
@@ -100,6 +106,7 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 ### 4. **terraform-plan** (Conditional: PR only)
 
 **What it does:**
+
 1. Checks out code
 2. Configures AWS credentials via OIDC (no long-lived secrets)
 3. Downloads and installs Terraform
@@ -110,6 +117,7 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 8. Uploads plan artifact for later apply step
 
 **Why it's required:**
+
 - Validates IaC syntax and variable types
 - Shows team what infrastructure changes will occur before applying
 - Enables code review of infrastructure changes (drift detection, resource changes)
@@ -126,11 +134,13 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 ### 5. **docker-build** (Conditional: PR only)
 
 **What it does:**
+
 - Builds backend Docker image from `packages/backend/Dockerfile`
 - Builds frontend Docker image from `packages/frontend/Dockerfile`
 - Does NOT push images or authenticate with AWS (no credentials needed)
 
 **Why it's required:**
+
 - Validates Dockerfiles are syntactically correct
 - Catches build-time errors (missing dependencies, bad COPY paths, etc.)
 - Ensures services can be containerized before attempting deployment
@@ -144,6 +154,7 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 ### 6. **terraform-apply** (Conditional: Push to main only)
 
 **What it does:**
+
 1. Checks out code
 2. Configures AWS credentials via OIDC
 3. Removes mock provider flags from `main.tf` (switches to real OIDC auth)
@@ -153,6 +164,7 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 7. Extracts Terraform outputs (Load Balancer URL) and posts to Step Summary
 
 **Why it's required:**
+
 - Applies infrastructure plan to AWS (creates/updates resources)
 - Only runs on push to main (not on PRs—review required before production change)
 - Uses OIDC to assume temporary AWS credentials (no static secrets in workflow)
@@ -169,6 +181,7 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 ### 7. **build-and-push** (Conditional: Push to main only)
 
 **What it does:**
+
 1. Checks out code
 2. Configures AWS credentials via OIDC
 3. Uses Terraform to query stack outputs (ECR repository URLs)
@@ -180,6 +193,7 @@ A service team adopts the golden path by creating a simple caller workflow (e.g.
 9. Triggers ECS service update (force new deployment)
 
 **Why it's required:**
+
 - Builds production-ready container images
 - Pushes images to ECR (AWS's managed container registry)
 - Maintains both mutable `latest` tag and immutable commit SHA tags (for rollback)
@@ -240,21 +254,23 @@ jobs:
 
 ## Required Checks & Why They Matter
 
-| Check | Runs | Failure Mode | Why Required |
-|-------|------|--------------|--------------|
-| **lint** | Always | ESLint errors | Code quality, consistency |
-| **test** | Always | Jest or coverage <80% | Functional correctness, regression prevention |
-| **security-scan** | PR (if enabled) | Checkov HIGH findings | Prevent insecure IaC from reaching prod |
-| **terraform-plan** | PR (if enabled) | Terraform error or plan failure | Validate IaC syntax, show infrastructure diffs |
-| **docker-build** | PR only | Docker build failure | Ensure images build before pushing to ECR |
-| **terraform-apply** | Push to main | Apply failure | Deploy approved infrastructure to AWS |
-| **build-and-push** | Push to main | ECR push failure | Update ECS tasks with latest container images |
+| Check               | Runs            | Failure Mode                    | Why Required                                   |
+| ------------------- | --------------- | ------------------------------- | ---------------------------------------------- |
+| **lint**            | Always          | ESLint errors                   | Code quality, consistency                      |
+| **test**            | Always          | Jest or coverage <80%           | Functional correctness, regression prevention  |
+| **security-scan**   | PR (if enabled) | Checkov HIGH findings           | Prevent insecure IaC from reaching prod        |
+| **terraform-plan**  | PR (if enabled) | Terraform error or plan failure | Validate IaC syntax, show infrastructure diffs |
+| **docker-build**    | PR only         | Docker build failure            | Ensure images build before pushing to ECR      |
+| **terraform-apply** | Push to main    | Apply failure                   | Deploy approved infrastructure to AWS          |
+| **build-and-push**  | Push to main    | ECR push failure                | Update ECS tasks with latest container images  |
 
 **PR workflow (on `pull_request`):**
+
 - lint ✅ → test ✅ → docker-build → (optional) security-scan → (optional) terraform-plan
 - All must pass before PR merge is allowed
 
 **Main workflow (on `push` to `main`):**
+
 - lint ✅ → test ✅ → docker-build → security-scan → terraform-plan → **terraform-apply** → **build-and-push**
 - Runs end-to-end: infrastructure, then container images
 
@@ -265,12 +281,14 @@ jobs:
 ### Prerequisites
 
 Your GitHub repository must have an **AWS IAM role configured for OIDC federation** that permits:
+
 - `sts:AssumeRoleWithWebIdentity` from GitHub's OIDC provider
 - Policies: `AmazonEC2FullAccess`, `AmazonECS_FullAccess`, `AmazonEC2ContainerRegistryFullAccess`, `S3` and `Terraform` state access
 
 ### Setup
 
 1. **Get the role ARN from your platform team:**
+
    ```
    arn:aws:iam::123456789012:role/github-actions-todo-service-oidc-role
    ```
@@ -382,6 +400,7 @@ Developer pushes to feature branch
 
 **Cause:** OIDC role ARN is missing or incorrect  
 **Solution:**
+
 1. Check that `AWS_ROLE_ARN` secret is set in repository settings
 2. Verify the role ARN format: `arn:aws:iam::ACCOUNT:role/ROLE_NAME`
 3. Confirm the role has trust relationship with GitHub OIDC provider
@@ -390,6 +409,7 @@ Developer pushes to feature branch
 
 **Cause:** S3 state bucket does not exist or is not accessible  
 **Solution:**
+
 1. Verify S3 bucket `pe-labs-terraform-state` exists in `us-east-2`
 2. Confirm bucket is accessible from the OIDC role's account
 3. Check Terraform backend config in `infra/stacks/dev/main.tf` (S3 backend block is commented out for local dev)
@@ -398,6 +418,7 @@ Developer pushes to feature branch
 
 **Cause:** Path to Dockerfile is incorrect  
 **Solution:**
+
 1. Verify `packages/backend/Dockerfile` exists
 2. Verify `packages/frontend/Dockerfile` exists
 3. Check working directory in the build step
@@ -406,6 +427,7 @@ Developer pushes to feature branch
 
 **Cause:** `id-token: write` is not declared at caller level  
 **Solution:**
+
 1. Ensure **top-level** `permissions:` in `todo-service-ci.yml` includes `id-token: write`
 2. Declaring it only in the reusable workflow is not sufficient (GitHub only grants token to workflows that explicitly request it)
 
@@ -413,6 +435,7 @@ Developer pushes to feature branch
 
 **Cause:** Jest test fails before coverage is generated, or coverage file path is incorrect  
 **Solution:**
+
 1. Fix the Jest test failure first
 2. Verify coverage JSON file path: `packages/backend/coverage/coverage-summary.json`
 3. Check that Jest is run with `--coverage` flag
